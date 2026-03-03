@@ -119,17 +119,6 @@ class CompensationWidget(QWidget):
         spectrum_group.setLayout(spectrum_layout)
         layout.addWidget(spectrum_group)
         
-        # Stability info
-        stability_group = QGroupBox("Stability Analysis")
-        stability_layout = QVBoxLayout()
-        
-        self.stability_text = QPlainTextEdit()
-        self.stability_text.setReadOnly(True)
-        self.stability_text.setMaximumHeight(100)
-        stability_layout.addWidget(self.stability_text)
-        
-        stability_group.setLayout(stability_layout)
-        layout.addWidget(stability_group)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -172,7 +161,7 @@ class CompensationWidget(QWidget):
             print(f"Error computing compensation: {e}")
     
     def update_display(self):
-        """Update spectrum and stability displays."""
+        """Update spectrum and displays."""
         if not self.current_compensation:
             return
         
@@ -188,22 +177,11 @@ class CompensationWidget(QWidget):
         
         self.spectrum_text.setPlainText(spectrum_text)
         
-        # Stability analysis
-        stability_text = "Stability Analysis:\n"
-        
         # Check for high gains
         gain_db = 20 * np.log10(self.current_compensation.magnitude + 1e-10)
         high_gain_freq = self.current_compensation.frequencies[np.argmax(gain_db)]
-        stability_text += f"Peak Gain Frequency: {high_gain_freq:.1f} Hz\n"
         
         # Check phase stability
         phase_unwrapped = np.unwrap(self.current_compensation.phase)
         max_phase_change = np.max(np.abs(np.diff(phase_unwrapped)))
-        stability_text += f"Max Phase Change: {np.degrees(max_phase_change):.1f} deg\n"
         
-        if max_gain_db := 20 * np.log10(max(self.current_compensation.magnitude, 1e-10)) <= 20:
-            stability_text += "Stability: GOOD\n"
-        else:
-            stability_text += "Stability: WARNING - High gain\n"
-        
-        self.stability_text.setPlainText(stability_text)
