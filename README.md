@@ -41,7 +41,7 @@ haptic-software/
 
 ### 1. Clone Repository
 ```bash
-cd /home/koen/Documents/Projects/2026\ -\ Haptic\ Software
+cd /haptic-software
 ```
 
 ### 2. Create Virtual Environment (recommended)
