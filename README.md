@@ -1,4 +1,5 @@
-# Haptic Software - Texture Recording & Rendering
+
+# Why Doesn’t This Texture Feel Right? A Hands-On Workshop on Data-Driven Haptic Texture Reproduction and Typical Pitfall
 
 A PyQt6-based application for recording, modeling, characterizing, and rendering haptic textures. This software implements a complete pipeline for haptic device research and development.
 
