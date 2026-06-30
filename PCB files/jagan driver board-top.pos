@@ -1,0 +1,39 @@
+### Footprint positions - created on 2026-06-16T15:40:20+0200 ###
+### Printed by KiCad version 9.0.1
+## Unit = mm, Angle = deg.
+## Side : top
+# Ref     Val                   Package                                                             PosX       PosY       Rot  Side
+C1        10uF                  C_0805_2012Metric                                               -61.9500    46.3000    0.0000  top
+D1        LED                   LED_0805_2012Metric                                             -45.0850    31.1150  -90.0000  top
+D2        LED                   LED_0805_2012Metric                                             -45.0850    24.7650  -90.0000  top
+D3        LED                   LED_0805_2012Metric                                             -45.0850    18.4150  -90.0000  top
+J1        Screw_Terminal_01x02  TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal   -70.3669    31.6667  -90.0000  top
+J2        Barrel_Jack           BarrelJack_Horizontal                                           -40.6400    36.8300  -90.0000  top
+J3        Screw_Terminal_01x02  TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal   -70.3319    19.5417  -90.0000  top
+J4        MCU_2                 PinSocket_1x20_P2.54mm_Vertical                                 -66.6750   -41.2750  180.0000  top
+J5        Conn_01x02_Pin        PinSocket_1x02_P2.54mm_Vertical                                  45.7200    41.9100  -90.0000  top
+J6        Conn_01x02_Pin        PinSocket_1x02_P2.54mm_Vertical                                  45.7200    11.4300  -90.0000  top
+J7        Screw_Terminal_01x02  TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal   -70.3319    43.5100  -90.0000  top
+J8        Conn_01x20_Pin        PinSocket_1x20_P2.54mm_Vertical                                 -71.7550   -41.2750  180.0000  top
+J9        Conn_01x20_Pin        PinSocket_1x20_P2.54mm_Vertical                                 -51.4350   -41.2750  180.0000  top
+J10       Conn_01x20_Pin        PinSocket_1x20_P2.54mm_Vertical                                 -46.3550   -41.2750  180.0000  top
+J11       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000    41.9100  -90.0000  top
+J12       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000    19.0500  -90.0000  top
+J13       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000    11.4300  -90.0000  top
+J14       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000   -11.4300  -90.0000  top
+J15       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000   -19.0500  -90.0000  top
+J16       Conn_01x08_Pin        PinSocket_1x08_P2.54mm_Vertical                                  38.1000   -41.9100  -90.0000  top
+J17       Conn_01x04_Pin        PinSocket_1x04_P2.54mm_Vertical                                  -3.8100    -2.5400   90.0000  top
+J18       Conn_01x04_Pin        PinSocket_1x04_P2.54mm_Vertical                                 -41.2750    -3.1750    0.0000  top
+R1        1K                    R_0805_2012Metric                                               -41.2750    31.1150  -90.0000  top
+R2        150E                  R_0805_2012Metric                                               -41.2750    24.7650  -90.0000  top
+R3        100E                  R_0805_2012Metric                                               -41.2750    18.4150  -90.0000  top
+R4        0E                    R_0805_2012Metric_Pad1.20x1.40mm_HandSolder                     -15.8750    -6.3500  180.0000  top
+R5        0E                    R_0805_2012Metric_Pad1.20x1.40mm_HandSolder                     -10.7950    -6.3500  180.0000  top
+R8        0E                    R_0805_2012Metric_Pad1.20x1.40mm_HandSolder                     -23.4950    -6.3500  180.0000  top
+R9        0E                    R_0805_2012Metric_Pad1.20x1.40mm_HandSolder                     -28.5750    -6.3500  180.0000  top
+REF**     protoboard_outline    protoboard_outline                                                0.0000     0.0000    0.0000  top
+SW1       SW_SPDT               K3-1391A-51                                                     -56.3700    38.7300    0.0000  top
+U8        TSR3-2450N            Converter_DCDC_TRACO_TSR2-24xxN_TSR2-24xxxN_THT                 -53.3400    26.0350  -90.0000  top
+U9        TSR3-2433N            Converter_DCDC_TRACO_TSR2-24xxN_TSR2-24xxxN_THT                 -53.3400    13.9700  -90.0000  top
+## End

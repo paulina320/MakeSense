@@ -1,0 +1,29 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,10uF,C_0805_2012Metric,-61.95,46.3,0,top
+D1,LED,LED_0805_2012Metric,-45.085,31.115,-90,top
+D2,LED,LED_0805_2012Metric,-45.085,24.765,-90,top
+D3,LED,LED_0805_2012Metric,-45.085,18.415,-90,top
+J1,Screw_Terminal_01x02,"TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",-70.366924,31.666665,-90,top
+J2,Barrel_Jack,BarrelJack_Horizontal,-40.64,36.83,-90,top
+J3,Screw_Terminal_01x02,"TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",-70.33188,19.541687,-90,top
+J4,MCU 2,PinSocket_1x20_P2.54mm_Vertical,-66.675,-41.275,180,top
+J5,Conn_01x02_Pin,PinSocket_1x02_P2.54mm_Vertical,45.72,41.91,-90,top
+J6,Conn_01x02_Pin,PinSocket_1x02_P2.54mm_Vertical,45.72,11.43,-90,top
+J7,Screw_Terminal_01x02,"TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",-70.33188,43.510019,-90,top
+J8,Conn_01x20_Pin,PinSocket_1x20_P2.54mm_Vertical,-71.755,-41.275,180,top
+J9,Conn_01x20_Pin,PinSocket_1x20_P2.54mm_Vertical,-51.435,-41.275,180,top
+J10,Conn_01x20_Pin,PinSocket_1x20_P2.54mm_Vertical,-46.355,-41.275,180,top
+J11,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,41.91,-90,top
+J12,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,19.05,-90,top
+J13,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,11.43,-90,top
+J14,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,-11.43,-90,top
+J15,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,-19.05,-90,top
+J16,Conn_01x08_Pin,PinSocket_1x08_P2.54mm_Vertical,38.1,-41.91,-90,top
+J17,Conn_01x04_Pin,PinSocket_1x04_P2.54mm_Vertical,-3.81,-2.54,90,top
+J18,Conn_01x04_Pin,PinSocket_1x04_P2.54mm_Vertical,-41.275,-3.175,0,top
+R1,1K,R_0805_2012Metric,-41.275,31.115,-90,top
+R2,150E,R_0805_2012Metric,-41.275,24.765,-90,top
+R3,100E,R_0805_2012Metric,-41.275,18.415,-90,top
+R4,0E,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,-15.875,-6.35,180,top
+R9,0E,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,-28.575,-6.35,180,top
+SW1,SW_SPDT,K3-1391A-51,-56.37,38.73,0,top
