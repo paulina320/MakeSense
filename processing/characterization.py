@@ -19,6 +19,9 @@ class ActuatorCharacterization:
     phase: np.ndarray        # Phase response
     excitation_type: str = ""
     notes: str = ""
+    excitation: Optional[np.ndarray] = None
+    response: Optional[np.ndarray] = None
+    sample_rate: int = 44100
     
     def get_transfer_function(self, fft_size: int = 2048) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -141,6 +144,9 @@ class Characterizer:
             magnitude=magnitude,
             phase=phase,
             excitation_type=excitation_type,
+            excitation=excitation.copy(),
+            response=response.copy(),
+            sample_rate=self.sample_rate,
         )
     
     def combine_measurements(
@@ -182,4 +188,5 @@ class Characterizer:
             magnitude=magnitude,
             phase=phase,
             notes="Combined from multiple measurements",
+            sample_rate=self.sample_rate,
         )

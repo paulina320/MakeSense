@@ -50,7 +50,10 @@ pyparsing==3.3.2
 PyQt6==6.10.2
 PyQt6-Qt6==6.10.2
 PyQt6_sip==13.11.0
+pyserial==3.5
 pyqtgraph==0.14.0
+qrcode==8.2
+pytest==9.0.2
 python-dateutil==2.9.0.post0
 pyzmq==27.1.0
 referencing==0.37.0

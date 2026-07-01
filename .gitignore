@@ -43,6 +43,7 @@ projects/
 *.wav
 *.csv
 *.json
+!compensation_filters/*.json
 temp/
 *.npz
 
@@ -54,3 +55,7 @@ htmlcov/
 # Documentation
 docs/_build/
 site/
+
+# STM32 generated build output
+firmware/**/Debug/
+firmware/**/Release/

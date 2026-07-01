@@ -1,0 +1,9 @@
+{
+  "name": "Workshop demo – gentle low-pass",
+  "method": "filtfilt",
+  "sample_rate": 10000,
+  "b": [0.02785977, 0.05571953, 0.02785977],
+  "a": [1.0, -1.47548044, 0.58691951],
+  "actuator_name": "Demo actuator",
+  "notes": "Example zero-phase compensation. It attenuates high-frequency content while preserving timing."
+}

@@ -7,6 +7,8 @@ from .model_widget import ModelWidget
 from .characterization_widget import CharacterizationWidget
 from .compensation_widget import CompensationWidget
 from .rendering_widget import RenderingWidget
+from .device_status_widget import DeviceStatusWidget
+from .device_connected_widget import DeviceConnectedWidget
 
 __all__ = [
     "RecordingWidget",
@@ -14,4 +16,6 @@ __all__ = [
     "CharacterizationWidget",
     "CompensationWidget",
     "RenderingWidget",
+    "DeviceStatusWidget",
+    "DeviceConnectedWidget"
 ]

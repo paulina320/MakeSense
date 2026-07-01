@@ -1,109 +1,184 @@
-
 # Why Doesn’t This Texture Feel Right? A Hands-On Workshop on Data-Driven Haptic Texture Reproduction and Typical Pitfall
 
-A PyQt6-based application for recording, modeling, characterizing, and rendering haptic textures. This software implements a complete pipeline for haptic device research and development.
+"Why Doesn't This Texture Feel Right?" is a PyQt6 workshop application for recording, modeling,
+characterizing, compensating, and rendering haptic textures with the MakeSense
+hardware kit.
 
-## Architecture
+The interface is organized as a guided pipeline:
 
-### Modular Design
-```
-haptic-software/
-├── ui/                          # PyQt6 UI widgets
-│   ├── main_window.py          # Main application window
-│   ├── recording_widget.py
-│   ├── model_widget.py
-│   ├── characterization_widget.py
-│   ├── compensation_widget.py
-│   ├── rendering_widget.py
-│   └── evaluation_widget.py
-├── processing/                  # Signal processing (pure Python)
-│   ├── fft_tools.py            # Frequency domain analysis
-│   ├── recording.py            # Recording data structures
-│   ├── texture_models.py       # Texture representations
-│   ├── characterization.py     # Actuator characterization
-│   ├── compensation.py         # Compensation filters
-│   └── rendering.py            # Synthesis and playback
-├── hardware/                    # Hardware abstraction
-│   ├── audio_interface.py      # Audio I/O
-│   ├── daq_interface.py        # DAQ abstraction
-│   └── accelerometer_interface.py
-├── data/                        # Data management
-│   ├── file_io.py              # File operations
-│   └── project_manager.py      # Project management
-├── visualization/              # Plotting utilities
-│   └── plot_widgets.py         # Matplotlib/PyQtGraph wrappers
-├── config/
-│   └── config.py               # Configuration parameters
-├── main.py                      # Application entry point
-└── requirements.txt            # Python dependencies
+1. Record a texture or load an existing recording.
+2. Select and inspect a texture model.
+3. Characterize the actuator and sensing path.
+4. Generate or load a compensation filter.
+5. Prepare and play the result through a workshop actuator.
+
+## Repository layout
+
+```text
+haptic-workshop/
+├── firmware/
+│   └── stm32_haptic_device/        # Active STM32 firmware
+├── main.py                         # Application entry point
+├── ui/                             # PyQt6 interface and theme assets
+├── processing/                     # DSP and texture models
+├── hardware/                       # Serial device and mock interfaces
+├── data/                           # Recording file I/O
+├── visualization/                  # Plotting helpers
+├── config/                         # Application and hardware settings
+├── compensation_filters/           # Bundled compensation presets
+├── scripts/                        # Hardware and throughput diagnostics
+├── tests/                          # Automated tests
+├── requirements.txt
+└── PACKAGING.md
 ```
 
-## Installation
+## Installation from source
 
-### 1. Clone Repository
-```bash
-cd /haptic-software
+Run these commands from the repository root.
+
+### Windows
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
 ```
 
-### 2. Create Virtual Environment (recommended)
+### Linux
+
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+./.venv/bin/python -m pip install -r requirements.txt
+./.venv/bin/python main.py
 ```
 
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
+Linux may also require PortAudio and Qt platform libraries. See
+[PACKAGING.md](PACKAGING.md) for the Ubuntu/Debian packages used by packaged
+builds.
+
+## Hardware
+
+The default backend is the serial MakeSense haptic device:
+
+```python
+HAPTIC_DEVICE_CONFIG["backend"] = "haptic_device"
 ```
 
-### Optional: Hardware Support
-For specific hardware, install additional packages:
-```bash
-# For NI DAQ devices
-pip install nidaqmx
+The active firmware is located at:
 
-# For serial communication (Arduino, accelerometer)
-pip install pyserial
+```text
+firmware/stm32_haptic_device
 ```
 
-## Usage
+After flashing the firmware:
 
-### Running the Application
-```bash
-python main.py
+1. Connect the board over USB.
+2. Open the **Device** tab.
+3. Select the serial port under **Detailed Info**, if it was not detected
+   automatically.
+4. Press **Test Device**.
+5. Confirm that connection, communication, MAX11300/Pixi, IMU, and USB
+   throughput checks pass.
+
+The simple throughput health check runs full-duplex at 10 ksample/s for 30
+seconds and requires at least 9.5 ksample/s RX and rendered throughput, with no
+steady-state underruns or render-buffer overruns.
+
+For development without hardware, select the mock backend in
+`config/config.py`:
+
+```python
+HAPTIC_DEVICE_CONFIG["backend"] = "mock"
 ```
+
+Protocol and firmware details are documented in
+[docs/haptic_device_protocol.md](docs/haptic_device_protocol.md).
+
+## Workshop workflow
+
+### Device
+
+Runs the participant-facing device health check. Advanced connection, IMU, and
+throughput controls are hidden under **Detailed Info**.
+
+### 1. Recording
+
+Records Pixi and/or IMU signals at a selectable sample rate and duration.
+Recordings can also be imported or exported as WAV, CSV, or NPZ.
+
+### 2. Texture Model
+
+Selects a texture representation and compares its reconstructed spectrum with
+the original signal.
+
+### 3. Characterization
+
+Plays an excitation through the actuator, records the response, and estimates
+its transfer function.
+
+### 4. Compensation
+
+Provides two explicit paths:
+
+- Generate an inverse response from the characterization in step 3.
+- Load the current generated filter, a bundled preset, a user-saved filter, or
+  another JSON filter.
+
+Both frequency-domain filters and zero-phase `filtfilt` filters are supported.
+The screen plots the current signal spectrum before and after compensation.
+
+Bundled filters live in `host/compensation_filters`. User-saved filters are
+written outside the installation:
+
+- Windows: `%LOCALAPPDATA%\MakeSense\compensation_filters`
+- Linux: `${XDG_DATA_HOME:-$HOME/.local/share}/MakeSense/compensation_filters`
+
+### 5. Rendering
+
+Shows exactly which source, compensation, duration, sample rate, and workshop
+output will be played. The workshop UI exposes:
+
+- Output 1 — Haptuator
+- Output 2 — LRA
+
+Playback uses a prefilled and continuously replenished hardware buffer to avoid
+USB scheduling gaps.
 
 ## Configuration
 
-Edit `config/config.py` to customize:
-- Default audio parameters (sample rate, duration)
-- Device presets (Haptuator, LRA)
-- Model parameters (bands, complexity)
-- Compensation settings (regularization, max gain)
-- UI settings (window size, dark mode)
+Important settings are in `config/config.py`:
 
-### Supported DAQ
-- Mock (testing)
-- National Instruments (nidaqmx)
-- Custom implementations
+- serial backend, port, baud rate, and timeouts;
+- default hardware channels and sample rates;
+- recording, modeling, characterization, compensation, and rendering values;
+- window dimensions and application title.
 
-### Supported Actuators
-- Haptuator
-- LRA (Linear Resonant Actuator)
-- Custom via plugin interface
+## Diagnostics
 
-## File Formats
+Useful scripts in `host/scripts` include:
 
-### Recordings
-- WAV: Standard audio format
-- CSV: Comma-separated values
-- NPZ: NumPy compressed archive
+- `render_stream_sweep.py` — sustained host-streamed rendering;
+- `haptic_max_throughput.py` — RX, TX, and duplex throughput sweeps;
+- `dac_output_test.py` and `dac_sine_test.py` — direct output checks.
 
-### Session Data
-- JSON: Project metadata and session state
-- NPZ: Transfer functions and filter coefficients
+## Tests
 
-## Development
+From `host`:
 
-**Version**: 0.1  
-**Last Updated**: March 2, 2026  
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+## Building executables
+
+Windows and Linux PyInstaller onedir builds are prepared. See
+[PACKAGING.md](PACKAGING.md) for dependencies and build commands.
+
+## Theme and licensing
+
+The interface uses the MIT-licensed PyDracula light stylesheet adapted to the
+MakeSense palette. The upstream stylesheet and license are retained in
+`ui/`.
+
+**Version:** 1.0.0  
+**Updated:** June 30, 2026

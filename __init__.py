@@ -22,7 +22,7 @@ from hardware import (
     create_daq_interface,
     create_accelerometer_interface,
 )
-from data import ProjectManager, FileIO
+from data import FileIO
 
 __all__ = [
     "MainWindow",
@@ -34,6 +34,5 @@ __all__ = [
     "create_audio_interface",
     "create_daq_interface",
     "create_accelerometer_interface",
-    "ProjectManager",
     "FileIO",
 ]

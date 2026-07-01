@@ -19,7 +19,7 @@ from processing.recording import Recording, RecordingMetadata
 
 
 class FileIO:
-    """File I/O operations for project data."""
+    """File I/O operations for recordings and processed data."""
     
     @staticmethod
     def save_wav(
@@ -146,10 +146,12 @@ class FileIO:
         elif format == "csv":
             FileIO.save_csv(filepath, recording.data)
         elif format == "npz":
+            channel_names = recording.metadata.channel_names or []
             FileIO.save_npz(
                 filepath,
                 data=recording.data,
                 sample_rate=recording.sample_rate,
+                channel_names=np.asarray(channel_names, dtype=object),
             )
         else:
             raise ValueError(f"Unsupported format: {format}")
@@ -181,6 +183,8 @@ class FileIO:
             npz_data = FileIO.load_npz(filepath)
             data = npz_data.get('data')
             sample_rate = int(npz_data.get('sample_rate', 44100))
+            if 'channel_names' in npz_data:
+                metadata.channel_names = [str(name) for name in npz_data['channel_names'].tolist()]
         else:
             raise ValueError(f"Unsupported format: {format}")
         

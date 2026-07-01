@@ -53,7 +53,7 @@ TEXTURE_MODEL_CONFIG = {
         "name": "ARMA Model",
         "description": "Autoregressive Moving Average model",
         "default_parameters": {
-            "ar_order": 5,  # Autoregressive order
+            "ar_order": 6,  # Autoregressive order
             "ma_order": 1,  # Moving average order
         }
     },
@@ -61,7 +61,7 @@ TEXTURE_MODEL_CONFIG = {
         "name": "MFCC Model",
         "description": "Mel-frequency cepstral coefficients",
         "default_parameters": {
-            "num_coefficients": 13,
+            "num_coefficients": 10,
             "frame_size": 0.025,  # seconds (25 ms)
             "frame_stride": 0.010,  # seconds (10 ms)
             "num_filters": 26,
@@ -174,31 +174,10 @@ EVALUATION_CONFIG = {
 }
 
 # ============================================================================
-# DATA MANAGEMENT
-# ============================================================================
-DATA_CONFIG = {
-    "project_base_dir": "./projects",
-    "subdirectories": {
-        "recordings": "recordings",
-        "models": "models",
-        "characterizations": "characterizations",
-        "compensation_filters": "compensation",
-        "evaluation_results": "evaluation",
-        "exports": "exports",
-    },
-    "file_formats": {
-        "audio": "wav",
-        "data": "csv",
-        "transfer_function": "npz",
-        "session": "json",
-    },
-}
-
-# ============================================================================
 # UI CONFIGURATION
 # ============================================================================
 UI_CONFIG = {
-    "app_name": "Haptic Software - Texture Recording & Rendering",
+    "app_name": "MakeSense - Why Doesn't This Texture Feel Right?",
     "window_width": 1400,
     "window_height": 900,
     "dark_mode": False,
@@ -238,6 +217,32 @@ HARDWARE_CONFIG = {
     "serial_timeout": 2.0,  # seconds
     "daq_sampling_rate": 44100,  # Hz
     "daq_channels": 1,
+    "device_backend": "haptic_device",  # "mock" or "haptic_device"
+}
+
+HAPTIC_DEVICE_CONFIG = {
+    "backend": "haptic_device",  # "mock" or "haptic_device"
+    "default_port": None,
+    "baudrate": 921600,
+    "serial_timeout": 0.5,
+    "command_timeout": 3.0,
+    "frame_queue_size": 64,
+    "render_frame_samples": 128,
+    "default_sample_rate": 44100,
+    "default_channels": [0],
+    "channels": [
+        {
+            "pin": pin,
+            "role": "high_z",
+            "differential_partner": None,
+            "adc_range": "0_2_5",
+            "dac_range": "0_10",
+            "reference": "internal",
+            "averaging": 1,
+            "stream_enabled": False,
+        }
+        for pin in range(20)
+    ],
 }
 
 # ============================================================================
@@ -249,11 +254,3 @@ THREADING_CONFIG = {
     "ring_buffer_capacity": 4,  # Number of buffers
 }
 
-# ============================================================================
-# PROJECT DEFAULTS
-# ============================================================================
-PROJECT_DEFAULTS = {
-    "version": "1.0",
-    "author": "Haptic Software User",
-    "description": "Haptic texture recording and rendering project",
-}

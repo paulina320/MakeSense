@@ -20,6 +20,7 @@ class RecordingMetadata:
     timestamp: datetime = None
     duration: float = 0.0
     sample_rate: int = 44100
+    channel_names: Optional[List[str]] = None
     
     def __post_init__(self):
         if self.timestamp is None:

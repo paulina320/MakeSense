@@ -14,7 +14,7 @@ Architecture:
 - UI Layer: PyQt6 widgets
 - Processing Layer: Pure Python signal processing
 - Hardware Layer: Device abstraction (audio, DAQ, accelerometer)
-- Data Layer: Project management and file I/O
+- Data Layer: File I/O
 - Visualization: Real-time plotting support
 """
 
@@ -26,25 +26,31 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from ui.main_window import MainWindow
+from ui.theme import MAKESENSE_THEME
 
 
 def main():
     """Main entry point."""
-    # Create application
     app = QApplication(sys.argv)
     
-    # Set application style
     try:
-        app.setStyle('Fusion')  # Modern cross-platform style
+        app.setStyle('Fusion')
     except:
         pass
+    app.setStyleSheet(MAKESENSE_THEME)
+    app.setWindowIcon(QIcon(str(Path(__file__).parent / "ui" / "icons" / "makesense.svg")))
     
-    # Create and show main window
     window = MainWindow()
+    available = app.primaryScreen().availableGeometry()
+    window.resize(
+        min(window.width(), max(1, available.width() - 40)),
+        min(window.height(), max(1, available.height() - 40)),
+    )
+    window.move(available.center() - window.rect().center())
     window.show()
     
-    # Run application
     sys.exit(app.exec())
 
 

@@ -58,9 +58,15 @@ class MockDAQInterface(DAQInterface):
     def __init__(self):
         """Initialize mock DAQ."""
         self._running = False
+        self._connected = True
+        self._rendering = False
         self._channels = [0]
         self._sample_rate = 44100
         self._sample_count = 0
+        self._imu_stream_enabled = False
+        self._imu_sample_rate = 100
+        self._imu_sample_count = 0
+        self._last_render_buffer = None
 
     def list_devices(self) -> List[Dict]:
         """Return mock devices."""
@@ -106,8 +112,115 @@ class MockDAQInterface(DAQInterface):
     def is_running(self) -> bool:
         """Check if running."""
         return self._running
+
+    def connect(self, port=None) -> bool:
+        """Connect to mock device."""
+        self._connected = True
+        return True
+
+    def disconnect(self) -> None:
+        """Disconnect mock device."""
+        self._connected = False
+        self._running = False
+        self._rendering = False
+
+    def is_connected(self) -> bool:
+        """Check mock connection status."""
+        return self._connected
+
+    def get_available_ports(self) -> list:
+        """Return mock serial-like ports."""
+        return ["MOCK"]
+
+    def get_status(self) -> dict:
+        """Return mock status payload."""
+        return {
+            "connected": self._connected,
+            "port": "MOCK",
+            "firmware": "mock",
+            "pixi_ok": True,
+            "imu_ok": True,
+            "imu_stream": self._imu_stream_enabled,
+            "imu_rate": self._imu_sample_rate,
+            "acquiring": self._running,
+            "rendering": self._rendering,
+            "sample_rate": self._sample_rate,
+            "dropped_frames": 0,
+            "underruns": 0,
+        }
+
+    def configure_channel(self, pin: int, role: str, **kwargs) -> str:
+        """Accept channel configuration in mock mode."""
+        return f"OK mock channel {pin} {role}"
+
+    def configure_imu_stream(self, sample_rate: int = 100, enabled: bool = True) -> str:
+        """Configure mock IMU streaming."""
+        self._imu_sample_rate = int(sample_rate)
+        self._imu_stream_enabled = bool(enabled)
+        return "OK mock imu stream"
+
+    def read_available_imu(self, max_samples: int = 16) -> list:
+        """Generate mock IMU samples while acquisition and IMU streaming are active."""
+        if not self._running or not self._imu_stream_enabled:
+            return []
+        count = max(1, min(max_samples, self._imu_sample_rate // 20))
+        samples = []
+        for _ in range(count):
+            t = self._imu_sample_count / self._imu_sample_rate
+            timestamp_us = int(t * 1_000_000)
+            samples.append({
+                "timestamp_us": timestamp_us,
+                "ok": True,
+                "accel_ok": True,
+                "gyro_ok": True,
+                "mag_ok": True,
+                "bmp_ok": True,
+                "accel": [
+                    int(256 * np.sin(2 * np.pi * 2 * t)),
+                    int(256 * np.sin(2 * np.pi * 3 * t)),
+                    int(256 * np.sin(2 * np.pi * 4 * t)),
+                ],
+                "gyro": [
+                    int(128 * np.sin(2 * np.pi * 5 * t)),
+                    int(128 * np.sin(2 * np.pi * 6 * t)),
+                    int(128 * np.sin(2 * np.pi * 7 * t)),
+                ],
+                "mag": [
+                    int(64 * np.sin(2 * np.pi * 1 * t)),
+                    int(64 * np.cos(2 * np.pi * 1 * t)),
+                    int(64 * np.sin(2 * np.pi * 0.5 * t)),
+                ],
+                "bmp_pressure_raw": int(100000 + 100 * np.sin(2 * np.pi * 0.2 * t)),
+                "bmp_temperature_raw": int(2500 + 10 * np.sin(2 * np.pi * 0.1 * t)),
+            })
+            self._imu_sample_count += 1
+        return samples
+
+    def start_rendering(self) -> None:
+        """Start mock rendering."""
+        self._rendering = True
+
+    def stop_rendering(self) -> None:
+        """Stop mock rendering."""
+        self._rendering = False
+
+    def write_render_buffer(self, signal: np.ndarray) -> None:
+        """Store the latest mock render buffer."""
+        self._last_render_buffer = np.asarray(signal)
+
+    def configure_render_outputs(self, channels: list[int]) -> None:
+        """Accept render output configuration in mock mode."""
+        self._render_channels = channels or [1]
+
+    def configure_render_timing(self, sample_rate: int) -> None:
+        """Set mock render sample rate."""
+        self._sample_rate = int(sample_rate)
+
+    def recent_errors(self) -> list:
+        """Return recent mock protocol errors."""
+        return []
     
-    def record_response(self, excitation: np.ndarray) -> np.ndarray:
+    def record_response(self, excitation: np.ndarray, *args, **kwargs) -> np.ndarray:
         """Simulate recording response to excitation."""
         # For testing, just return a delayed and attenuated version of the excitation
         delay_samples = int(0.01 * self._sample_rate)  # 10 ms delay
@@ -131,5 +244,13 @@ def create_daq_interface(backend: str = "mock") -> DAQInterface:
     """
     if backend == "mock":
         return MockDAQInterface()
+    elif backend in ("haptic_device", "serial"):
+        from .haptic_device_interface import create_haptic_device_interface
+        try:
+            from config import config
+            settings = config.HAPTIC_DEVICE_CONFIG
+        except Exception:
+            settings = {}
+        return create_haptic_device_interface(settings)
     else:
         raise ValueError(f"Unsupported DAQ backend: {backend}")

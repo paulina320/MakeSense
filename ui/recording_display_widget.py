@@ -23,6 +23,7 @@ class RecordingDisplayWidget(QWidget):
     
     def __init__(self):
         super().__init__()
+        self._live_curves = []
         self.setup_ui()
     
     def setup_ui(self):
@@ -35,21 +36,24 @@ class RecordingDisplayWidget(QWidget):
         
         # Info label
         self.info_label = QLabel("No recording loaded")
+        self.info_label.setStyleSheet("font-weight: 600; font-size: 14px; color: #ef6673;")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         display_layout.addWidget(self.info_label)
         
         # Setup pyqtgraph plot widget
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground('w')
+        self.plot_widget.setBackground("#ffffff")
         self.plot_widget.setLabel('left', 'Amplitude')
         self.plot_widget.setLabel('bottom', 'Time', units='s')
         self.plot_widget.setTitle('Recorded Signal')
         self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.plot_widget.setMinimumHeight(300)
+        self.plot_widget.setMinimumHeight(150)
         
         # Configure plot appearance
-        self.plot_widget.getPlotItem().getAxis('left').setPen(pg.mkPen(color='k', width=1))
-        self.plot_widget.getPlotItem().getAxis('bottom').setPen(pg.mkPen(color='k', width=1))
+        self.plot_widget.getPlotItem().getAxis('left').setPen(pg.mkPen(color="#617086", width=1))
+        self.plot_widget.getPlotItem().getAxis('bottom').setPen(pg.mkPen(color="#617086", width=1))
+        self.plot_widget.getPlotItem().getAxis('left').setTextPen("#263246")
+        self.plot_widget.getPlotItem().getAxis('bottom').setTextPen("#263246")
         
         display_layout.addWidget(self.plot_widget)
         
@@ -70,30 +74,102 @@ class RecordingDisplayWidget(QWidget):
             return
         
         # Clear previous plot
+        plot_item = self.plot_widget.getPlotItem()
+        if plot_item.legend is not None:
+            plot_item.legend.scene().removeItem(plot_item.legend)
+            plot_item.legend = None
         self.plot_widget.clear()
+        self._live_curves = []
         
         # Create time axis
         duration = len(recording.data) / recording.sample_rate
-        time = np.linspace(0, duration, len(recording.data))
+        time = np.arange(len(recording.data)) / recording.sample_rate
         
         # Plot waveform
-        pen = pg.mkPen(color='b', width=1)
-        self.plot_widget.plot(time, recording.data, pen=pen)
+        data = np.asarray(recording.data)
+        if data.ndim == 1:
+            data = data.reshape(-1, 1)
+
+        channel_names = getattr(recording.metadata, "channel_names", None) or []
+        colors = ['b', 'r', 'g', 'm', 'c', 'y', 'k', (255, 128, 0), (128, 0, 255), (0, 128, 128)]
+        if data.shape[1] > 1:
+            self.plot_widget.addLegend()
+        for channel_index in range(data.shape[1]):
+            name = channel_names[channel_index] if channel_index < len(channel_names) else f"Input {channel_index + 1}"
+            pen = pg.mkPen(color=colors[channel_index % len(colors)], width=1)
+            self.plot_widget.plot(time, data[:, channel_index], pen=pen, name=name)
         
         # Update info label
         num_samples = len(recording.data)
         info_text = (
             f"Sample Rate: {recording.sample_rate} Hz | "
             f"Duration: {duration:.2f} s | "
-            f"Samples: {num_samples}"
+            f"Samples: {num_samples} | "
+            f"Inputs: {recording.num_channels}"
         )
         self.info_label.setText(info_text)
-    
+        self.info_label.setStyleSheet("font-weight: normal; font-size: 14px; color: #263246;")
+
+    def update_live_data(
+        self,
+        data: np.ndarray,
+        sample_rate: int,
+        channel_names: list[str],
+        first_sample: int = 0,
+    ):
+        """Update persistent plot curves with the latest acquisition window."""
+        values = np.asarray(data)
+        if values.ndim == 1:
+            values = values.reshape(-1, 1)
+        if values.size == 0:
+            return
+
+        colors = ['b', 'r', 'g', 'm', 'c', 'y', 'k', (255, 128, 0), (128, 0, 255), (0, 128, 128)]
+        if len(self._live_curves) != values.shape[1]:
+            plot_item = self.plot_widget.getPlotItem()
+            if plot_item.legend is not None:
+                plot_item.legend.scene().removeItem(plot_item.legend)
+                plot_item.legend = None
+            self.plot_widget.clear()
+            self._live_curves = []
+            if values.shape[1] > 1:
+                self.plot_widget.addLegend()
+            for channel_index in range(values.shape[1]):
+                name = (
+                    channel_names[channel_index]
+                    if channel_index < len(channel_names)
+                    else f"Input {channel_index + 1}"
+                )
+                self._live_curves.append(
+                    self.plot_widget.plot(
+                        pen=pg.mkPen(color=colors[channel_index % len(colors)], width=1),
+                        name=name,
+                    )
+                )
+
+        time_axis = (first_sample + np.arange(len(values), dtype=np.float64)) / max(1, sample_rate)
+        for channel_index, curve in enumerate(self._live_curves):
+            curve.setData(time_axis, values[:, channel_index])
+
+        self.info_label.setText(
+            f"Live | Sample Rate: {sample_rate} Hz | "
+            f"Elapsed: {(first_sample + len(values)) / max(1, sample_rate):.2f} s | "
+            f"Displayed: {len(values)} samples | Inputs: {values.shape[1]}"
+        )
+        self.info_label.setStyleSheet("font-weight: normal; font-size: 14px; color: #263246;")
+
+
     def clear_display(self):
         """Clear the display."""
+        plot_item = self.plot_widget.getPlotItem()
+        if plot_item.legend is not None:
+            plot_item.legend.scene().removeItem(plot_item.legend)
+            plot_item.legend = None
         self.plot_widget.clear()
+        self._live_curves = []
         self.info_label.setText("No recording loaded")
-    
+        self.info_label.setStyleSheet("font-weight: 600; font-size: 14px; color: #ef6673;")
+
     def load_from_file(self, file_path: str):
         """
         Load and display recording from file.
@@ -107,7 +183,7 @@ class RecordingDisplayWidget(QWidget):
             file_io = FileIO()
             
             if file_path.endswith('.npz'):
-                recording = file_io.load_npz(file_path)
+                recording = file_io.load_recording(file_path, "npz")
             elif file_path.endswith('.wav'):
                 data, sample_rate = file_io.load_wav(file_path)
                 recording = Recording(data, sample_rate)

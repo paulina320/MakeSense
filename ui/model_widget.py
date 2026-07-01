@@ -14,12 +14,13 @@ if str(project_root) not in sys.path:
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QSpinBox, QLabel, QRadioButton,
-    QStackedWidget, QDoubleSpinBox
+    QStackedWidget, QDoubleSpinBox, QComboBox, QCheckBox, QFileDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 import numpy as np
 from scipy import signal as sp_signal
 from processing.recording import Recording
+from processing.texture_models import create_texture_model
 from ui.model_display_widget import ModelDisplayWidget
 from config.config import TEXTURE_MODEL_CONFIG
 from scipy.ndimage import gaussian_filter1d
@@ -55,7 +56,6 @@ class ModelWidget(QWidget):
         
         for model_name in ["Raw Signal", "ARMA", "MFCC", "sPeak", "sBeta", "Spectral Slope"]:
             radio = QRadioButton(model_name)
-            radio.toggled.connect(lambda checked, name=model_name: self.on_model_changed(name, checked))
             self.radio_buttons[model_name] = radio
             radio_layout.addWidget(radio)
         
@@ -63,6 +63,23 @@ class ModelWidget(QWidget):
         model_layout.addLayout(radio_layout)
         model_group.setLayout(model_layout)
         layout.addWidget(model_group)
+
+        preprocessing_group = QGroupBox("Preprocessing")
+        preprocessing_layout = QVBoxLayout()
+
+        preprocessing_mode_layout = QHBoxLayout()
+        preprocessing_mode_layout.addWidget(QLabel("Mode:"))
+        self.preprocessing_combo = QComboBox()
+        self.preprocessing_combo.addItem("No preprocessing", "no_preprocessing")
+        self.preprocessing_combo.addItem("Whole signal", "whole_signal")
+        self.preprocessing_combo.addItem("4000-sample Hanning sweep average", "hanning_sweep_average")
+        preprocessing_mode_layout.addWidget(self.preprocessing_combo)
+        preprocessing_mode_layout.addStretch()
+        preprocessing_layout.addLayout(preprocessing_mode_layout)
+
+
+        preprocessing_group.setLayout(preprocessing_layout)
+        layout.addWidget(preprocessing_group)
         
         # Parameter configuration group
         params_group = QGroupBox("Model Parameters")
@@ -304,6 +321,10 @@ class ModelWidget(QWidget):
         
         layout.addStretch()
         self.setLayout(layout)
+        
+        # Connect radio signals now that param_stack exists
+        for model_name, radio in self.radio_buttons.items():
+            radio.toggled.connect(lambda checked, name=model_name: self.on_model_changed(name, checked))
     
     def set_recording(self, recording: Recording):
         """Set current recording and display its FFT."""
@@ -345,41 +366,65 @@ class ModelWidget(QWidget):
             return
         
         try:
-            if self.current_model_type == "Raw Signal":
-                # No processing needed
-                reconstructed = self.current_recording.data
-            
-            elif self.current_model_type == "ARMA":
-                reconstructed = self.apply_arma_model()
-            
-            elif self.current_model_type == "MFCC":
-                reconstructed = self.apply_mfcc_model()
-            
-            elif self.current_model_type == "sPeak":
-                reconstructed = self.apply_speak_model()
-            
-            elif self.current_model_type == "sBeta":
-                reconstructed = self.apply_sbeta_model()
-            
-            elif self.current_model_type == "Spectral Slope":
-                reconstructed = self.apply_spectral_slope_model()
-            
-            else:
-                reconstructed = self.current_recording.data
+            model = self._create_current_texture_model()
+            parameters = model.encode(self.current_recording.data, self.current_recording.sample_rate)
+            reconstructed = model.decode(parameters, self.current_recording.duration, self.current_recording.sample_rate)
             
             # Update display with reconstructed signal
-            self.display_widget.update_model_display(reconstructed, self.current_model_type)
+            self.display_widget.update_model_display(reconstructed, self.current_model_type, parameters)
             self.export_button.setEnabled(True)
             
             # Emit signal
             self.model_updated.emit({
                 "model_type": self.current_model_type,
+                "parameters": parameters,
+                "preprocessing_mode": self.preprocessing_combo.currentData(),
                 "reconstructed": reconstructed,
                 "original": self.current_recording.data
             })
             
         except Exception as e:
             print(f"Error applying model: {e}")
+
+    def _create_current_texture_model(self):
+        common = self._model_common_kwargs()
+        if self.current_model_type == "ARMA":
+            return create_texture_model("ar", ar_order=self.ar_order_spinbox.value(), **common)
+        if self.current_model_type == "MFCC":
+            return create_texture_model(
+                "mfcc",
+                num_coefficients=self.mfcc_coeffs_spinbox.value(),
+                num_filters=self.mfcc_filters_spinbox.value(),
+                frame_size=self.mfcc_framesize_spinbox.value() / 1000.0,
+                frame_stride=self.mfcc_framestride_spinbox.value() / 1000.0,
+                **common,
+            )
+        if self.current_model_type == "sPeak":
+            return create_texture_model("speak", num_peaks=self.speak_peaks_spinbox.value(), **common)
+        if self.current_model_type == "sBeta":
+            return create_texture_model(
+                "sbeta",
+                num_peaks=self.sbeta_peaks_spinbox.value(),
+                alpha_init=self.sbeta_alpha_spinbox.value(),
+                beta_init=self.sbeta_beta_spinbox.value(),
+                freq_low=self.sbeta_freqlow_spinbox.value(),
+                freq_high=self.sbeta_freqhigh_spinbox.value(),
+                **common,
+            )
+        if self.current_model_type == "Spectral Slope":
+            return create_texture_model(
+                "spectral_slope",
+                freq_low=self.slope_freqlow_spinbox.value(),
+                freq_high=self.slope_freqhigh_spinbox.value(),
+                **common,
+            )
+        return create_texture_model("raw", **common)
+
+    def _model_common_kwargs(self):
+        return {
+            "preprocessing_mode": self.preprocessing_combo.currentData()
+        }
+
     
     def apply_arma_model(self) -> np.ndarray:
         """Apply ARMA model to current recording."""
