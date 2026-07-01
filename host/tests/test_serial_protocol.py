@@ -67,7 +67,9 @@ class SerialProtocolTests(unittest.TestCase):
         sample = unpack_imu_sample(payload)
         self.assertEqual(sample["timestamp_us"], 123456)
         self.assertTrue(sample["ok"])
-        self.assertEqual(sample["accel"], [1, 2, 3])
+        np.testing.assert_allclose(sample["accel"], [0.0039, 0.0078, 0.0117])
+        self.assertEqual(sample["accel_raw"], [1, 2, 3])
+        self.assertEqual(sample["accel_unit"], "g")
         self.assertEqual(sample["gyro"], [4, 5, 6])
         self.assertEqual(sample["mag"], [7, 8, 9])
         self.assertEqual(sample["bmp_pressure_raw"], 1000)
@@ -83,7 +85,7 @@ class SerialProtocolTests(unittest.TestCase):
         samples = unpack_imu_samples(one + one)
         self.assertEqual(len(samples), 2)
         self.assertEqual(samples[0]["timestamp_us"], 1)
-        self.assertEqual(samples[1]["accel"], [1, 2, 3])
+        np.testing.assert_allclose(samples[1]["accel"], [0.0039, 0.0078, 0.0117])
 
 
 if __name__ == "__main__":

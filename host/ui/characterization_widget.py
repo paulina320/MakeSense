@@ -319,9 +319,9 @@ class CharacterizationWidget(QWidget):
     @staticmethod
     def _imu_field_labels() -> list[tuple[str, str]]:
         return [
-            ("accel_x", "Accel X"),
-            ("accel_y", "Accel Y"),
-            ("accel_z", "Accel Z"),
+            ("accel_x", "Accel X (g)"),
+            ("accel_y", "Accel Y (g)"),
+            ("accel_z", "Accel Z (g)"),
             ("gyro_x", "Gyro X"),
             ("gyro_y", "Gyro Y"),
             ("gyro_z", "Gyro Z"),

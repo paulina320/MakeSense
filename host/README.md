@@ -16,20 +16,22 @@ The interface is organized as a guided pipeline:
 
 ```text
 haptic-workshop/
-├── firmware/
-│   └── stm32_haptic_device/        # Active STM32 firmware
-├── main.py                         # Application entry point
-├── ui/                             # PyQt6 interface and theme assets
-├── processing/                     # DSP and texture models
-├── hardware/                       # Serial device and mock interfaces
-├── data/                           # Recording file I/O
-├── visualization/                  # Plotting helpers
-├── config/                         # Application and hardware settings
-├── compensation_filters/           # Bundled compensation presets
-├── scripts/                        # Hardware and throughput diagnostics
-├── tests/                          # Automated tests
-├── requirements.txt
-└── PACKAGING.md
+├── device/
+│   └── firmware/
+│       └── stm32_haptic_device/    # Active STM32 firmware
+└── host/
+    ├── main.py                     # Application entry point
+    ├── ui/                         # PyQt6 interface and theme assets
+    ├── processing/                 # DSP and texture models
+    ├── hardware/                   # Serial device and mock interfaces
+    ├── data/                       # Recording file I/O
+    ├── visualization/              # Plotting helpers
+    ├── config/                     # Application and hardware settings
+    ├── compensation_filters/       # Bundled compensation presets
+    ├── scripts/                    # Hardware and throughput diagnostics
+    ├── tests/                      # Automated tests
+    ├── requirements.txt
+    └── PACKAGING.md
 ```
 
 ## Installation from source
@@ -39,6 +41,7 @@ Run these commands from the repository root.
 ### Windows
 
 ```powershell
+cd host
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe main.py
@@ -47,6 +50,7 @@ python -m venv .venv
 ### Linux
 
 ```bash
+cd host
 python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python main.py
@@ -67,7 +71,7 @@ HAPTIC_DEVICE_CONFIG["backend"] = "haptic_device"
 The active firmware is located at:
 
 ```text
-firmware/stm32_haptic_device
+device/firmware/stm32_haptic_device
 ```
 
 After flashing the firmware:

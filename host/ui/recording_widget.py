@@ -203,7 +203,7 @@ class RecordingWorker(QThread):
 
         for field in self.imu_fields:
             columns.append(self._imu_field_to_column(imu_samples, field, num_samples).reshape(-1, 1))
-            channel_names.append(f"IMU {field.replace('_', ' ').title()}")
+            channel_names.append(self._imu_channel_name(field))
 
         if not columns:
             return np.zeros(num_samples), ["Input 1"]
@@ -262,7 +262,7 @@ class RecordingWorker(QThread):
             else:
                 imu_column = np.zeros(preview_samples, dtype=np.float32)
             columns.append(imu_column.reshape(-1, 1))
-            channel_names.append(f"IMU {field.replace('_', ' ').title()}")
+            channel_names.append(self._imu_channel_name(field))
 
         data = np.hstack(columns)
         if data.shape[1] == 1:
@@ -287,6 +287,11 @@ class RecordingWorker(QThread):
         if index is None:
             return float(value)
         return float(value[index]) if len(value) > index else 0.0
+
+    @staticmethod
+    def _imu_channel_name(field: str) -> str:
+        name = f"IMU {field.replace('_', ' ').title()}"
+        return f"{name} (g)" if field.startswith("accel_") else name
 
 
 class RecordingWidget(QWidget):
@@ -379,9 +384,9 @@ class RecordingWidget(QWidget):
         imu_grid = QGridLayout()
         self.imu_field_checks = {}
         imu_fields = [
-            ("accel_x", "Accel X"),
-            ("accel_y", "Accel Y"),
-            ("accel_z", "Accel Z"),
+            ("accel_x", "Accel X (g)"),
+            ("accel_y", "Accel Y (g)"),
+            ("accel_z", "Accel Z (g)"),
             ("gyro_x", "Gyro X"),
             ("gyro_y", "Gyro Y"),
             ("gyro_z", "Gyro Z"),

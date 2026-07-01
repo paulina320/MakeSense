@@ -32,6 +32,10 @@ class MessageType(IntEnum):
 
 IMU_SAMPLE = struct.Struct("<IBxhhhhhhhhhii")
 
+# ADXL345 DATA_FORMAT is configured as 0x0B: full-resolution, +/-16 g.
+# The datasheet specifies a nominal scale factor of 3.9 mg/LSB in this mode.
+ADXL345_G_PER_LSB = 0.0039
+
 
 @dataclass(frozen=True)
 class Frame:
@@ -192,6 +196,7 @@ def unpack_imu_sample(payload: bytes) -> dict:
         bmp_pressure_raw,
         bmp_temperature_raw,
     ) = IMU_SAMPLE.unpack(payload[: IMU_SAMPLE.size])
+    accel_raw = [ax, ay, az]
     return {
         "timestamp_us": timestamp_us,
         "ok": bool(flags & 0x01),
@@ -199,12 +204,24 @@ def unpack_imu_sample(payload: bytes) -> dict:
         "gyro_ok": bool(flags & 0x04),
         "mag_ok": bool(flags & 0x08),
         "bmp_ok": bool(flags & 0x10),
-        "accel": [ax, ay, az],
+        "accel": [value * ADXL345_G_PER_LSB for value in accel_raw],
+        "accel_raw": accel_raw,
+        "accel_unit": "g",
         "gyro": [gx, gy, gz],
         "mag": [mx, my, mz],
         "bmp_pressure_raw": bmp_pressure_raw,
         "bmp_temperature_raw": bmp_temperature_raw,
     }
+
+
+def convert_imu_accel_to_g(sample: dict) -> dict:
+    """Convert an IMU JSON response containing ADXL345 counts to g."""
+    converted = dict(sample)
+    accel_raw = list(sample.get("accel_raw", sample.get("accel", [0, 0, 0])))
+    converted["accel_raw"] = accel_raw
+    converted["accel"] = [float(value) * ADXL345_G_PER_LSB for value in accel_raw]
+    converted["accel_unit"] = "g"
+    return converted
 
 
 def unpack_imu_samples(payload: bytes) -> list[dict]:

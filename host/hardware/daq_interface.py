@@ -176,10 +176,11 @@ class MockDAQInterface(DAQInterface):
                 "mag_ok": True,
                 "bmp_ok": True,
                 "accel": [
-                    int(256 * np.sin(2 * np.pi * 2 * t)),
-                    int(256 * np.sin(2 * np.pi * 3 * t)),
-                    int(256 * np.sin(2 * np.pi * 4 * t)),
+                    0.10 * np.sin(2 * np.pi * 2 * t),
+                    0.05 * np.sin(2 * np.pi * 3 * t),
+                    1.0 + 0.10 * np.sin(2 * np.pi * 4 * t),
                 ],
+                "accel_unit": "g",
                 "gyro": [
                     int(128 * np.sin(2 * np.pi * 5 * t)),
                     int(128 * np.sin(2 * np.pi * 6 * t)),

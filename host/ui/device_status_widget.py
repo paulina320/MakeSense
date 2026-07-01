@@ -830,9 +830,13 @@ class DeviceStatusWidget(QWidget):
             return
         try:
             sample = self.hardware_interface.read_imu()
+            accel = sample.get("accel", [0, 0, 0])
+            gravity = sum(float(value) ** 2 for value in accel) ** 0.5
             lines = [
                 f"OK: {sample.get('ok', False)}",
-                f"Accel raw: {sample.get('accel', [0, 0, 0])}",
+                f"Accel: {[round(float(value), 4) for value in accel]} g",
+                f"Accel magnitude: {gravity:.4f} g (about 1 g while stationary)",
+                f"Accel raw: {sample.get('accel_raw', [0, 0, 0])} counts",
                 f"Gyro raw: {sample.get('gyro', [0, 0, 0])}",
                 f"Mag raw: {sample.get('mag', [0, 0, 0])}",
                 f"BMP pressure raw: {sample.get('bmp_pressure_raw', 0)}",
@@ -912,11 +916,15 @@ class DeviceStatusWidget(QWidget):
 
     def _show_imu_stream_samples(self, samples):
         latest = samples[-1]
+        accel = latest.get("accel", [0, 0, 0])
+        gravity = sum(float(value) ** 2 for value in accel) ** 0.5
         lines = [
             f"Stream samples read: {len(samples)}",
             f"Timestamp us: {latest.get('timestamp_us', 0)}",
             f"OK: {latest.get('ok', False)}",
-            f"Accel raw: {latest.get('accel', [0, 0, 0])}",
+            f"Accel: {[round(float(value), 4) for value in accel]} g",
+            f"Accel magnitude: {gravity:.4f} g (about 1 g while stationary)",
+            f"Accel raw: {latest.get('accel_raw', [0, 0, 0])} counts",
             f"Gyro raw: {latest.get('gyro', [0, 0, 0])}",
             f"Mag raw: {latest.get('mag', [0, 0, 0])}",
             f"BMP pressure raw: {latest.get('bmp_pressure_raw', 0)}",

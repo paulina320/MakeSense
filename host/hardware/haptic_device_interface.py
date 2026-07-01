@@ -25,6 +25,7 @@ from .serial_protocol import (
     PacketParser,
     TextLine,
     command,
+    convert_imu_accel_to_g,
     encode_frame,
     pack_i16_samples,
     unpack_imu_samples,
@@ -299,7 +300,7 @@ class HapticDeviceInterface(DAQInterface):
 
     def read_imu(self) -> Dict:
         reply = self.send_command("IMU_READ")
-        return self._json_reply(reply, "OK IMU_READ ")
+        return convert_imu_accel_to_g(self._json_reply(reply, "OK IMU_READ "))
 
     def get_status(self) -> DeviceStatus:
         if self.is_connected():
