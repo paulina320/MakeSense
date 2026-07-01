@@ -31,11 +31,11 @@ This keeps saving functional even when the application is installed under
 
 ## Linux
 
-Install the native libraries required by Qt and `sounddevice`. On
+Install the native libraries required by Qt. On
 Ubuntu/Debian:
 
 ```bash
-sudo apt-get install libportaudio2 libgl1 libegl1 libxkbcommon-x11-0 \
+sudo apt-get install libgl1 libegl1 libxkbcommon-x11-0 \
   libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-randr0 \
   libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
 ```

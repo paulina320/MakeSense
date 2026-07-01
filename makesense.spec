@@ -21,7 +21,6 @@ hiddenimports = (
     + [
         "scipy.signal",
         "scipy.fftpack",
-        "sounddevice",
     ]
 )
 

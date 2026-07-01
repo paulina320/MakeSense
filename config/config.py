@@ -10,7 +10,6 @@ AUDIO_CONFIG = {
     "default_sample_rate": 44100,  # Hz
     "default_duration": 5.0,  # seconds
     "channels": 1,  # Mono
-    "audio_backend": "sounddevice",  # or "pyaudio"
 }
 
 # ============================================================================

@@ -13,7 +13,7 @@ Features:
 Architecture:
 - UI Layer: PyQt6 widgets
 - Processing Layer: Pure Python signal processing
-- Hardware Layer: Device abstraction (audio, DAQ, accelerometer)
+- Hardware Layer: DAQ and haptic-device abstraction
 - Data Layer: File I/O
 - Visualization: Real-time plotting support
 """

@@ -18,9 +18,7 @@ from processing import (
     Renderer,
 )
 from hardware import (
-    create_audio_interface,
     create_daq_interface,
-    create_accelerometer_interface,
 )
 from data import FileIO
 
@@ -31,8 +29,6 @@ __all__ = [
     "Characterizer",
     "Compensator",
     "Renderer",
-    "create_audio_interface",
     "create_daq_interface",
-    "create_accelerometer_interface",
     "FileIO",
 ]

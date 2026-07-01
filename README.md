@@ -52,7 +52,7 @@ python3 -m venv .venv
 ./.venv/bin/python main.py
 ```
 
-Linux may also require PortAudio and Qt platform libraries. See
+Linux may also require Qt platform libraries. See
 [PACKAGING.md](PACKAGING.md) for the Ubuntu/Debian packages used by packaged
 builds.
 
