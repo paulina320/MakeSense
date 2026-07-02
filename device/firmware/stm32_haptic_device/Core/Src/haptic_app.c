@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HAPTIC_VERSION "stm32_haptic_device_0.2"
+#define HAPTIC_VERSION "stm32_haptic_device_0.4"
 #define CHANNEL_COUNT 20U
 #define RENDER_CAPACITY 8192U
 #define LINE_BUFFER_SIZE 128U
@@ -22,6 +22,7 @@
 #define RX_BYTES_PER_TICK_IDLE 256U
 #define MIN_DMA_BURST_WORDS 4U
 #define DEFAULT_IMU_STREAM_RATE_HZ 100UL
+#define MAX_IMU_STREAM_RATE_HZ 3200UL
 #define IMU_SAMPLE_PAYLOAD_SIZE 32U
 #define IMU_MAX_BATCH_SAMPLES (HAPTIC_MAX_BINARY_PAYLOAD / IMU_SAMPLE_PAYLOAD_SIZE)
 #define IMU_FLUSH_INTERVAL_US 10000UL
@@ -78,8 +79,28 @@ static uint32_t last_acquisition_flush_us = 0;
 static bool imu_stream_enabled = false;
 static uint32_t imu_stream_rate_hz = DEFAULT_IMU_STREAM_RATE_HZ;
 static uint32_t imu_stream_interval_us = 1000000UL / DEFAULT_IMU_STREAM_RATE_HZ;
+static uint8_t imu_sensor_mask = IMU_SELECT_ALL;
 static uint32_t next_imu_stream_us = 0;
 static uint32_t last_imu_flush_us = 0;
+
+static uint32_t max_imu_rate_for_mask(uint8_t mask) {
+  uint8_t count = 0U;
+  for (uint8_t bit = 0U; bit < 4U; bit++) {
+    if ((mask & (uint8_t)(1U << bit)) != 0U) {
+      count++;
+    }
+  }
+  if (count >= 4U) {
+    return 800UL;
+  }
+  if (count == 3U) {
+    return 1000UL;
+  }
+  if (count == 2U) {
+    return 1600UL;
+  }
+  return MAX_IMU_STREAM_RATE_HZ;
+}
 
 static uint32_t dropped_frames = 0;
 static uint32_t underruns = 0;
@@ -155,17 +176,40 @@ static uint16_t frame_index = 0;
 static uint8_t frame_type = 0;
 static uint16_t received_crc = 0;
 static uint16_t discard_remaining = 0;
+static uint32_t micros_last_cycles = 0;
+static uint32_t micros_accumulated = 0;
+static uint32_t micros_cycle_remainder = 0;
+static uint32_t micros_cycles_per_us = 1;
 
 static void flush_acquisition_frame(void);
 
 static uint32_t micros_now(void) {
-  return (uint32_t)(DWT->CYCCNT / (HAL_RCC_GetHCLKFreq() / 1000000UL));
+  uint32_t cycles = DWT->CYCCNT;
+  uint32_t elapsed_cycles = cycles - micros_last_cycles;
+  micros_last_cycles = cycles;
+
+  /*
+   * CYCCNT wraps every ~44.7 s at 96 MHz. Unsigned delta accumulation keeps
+   * this clock monotonic across that wrap. The returned microsecond counter
+   * then has the intended uint32_t wrap interval of ~71.6 minutes.
+   */
+  uint32_t total_cycles = micros_cycle_remainder + elapsed_cycles;
+  micros_accumulated += total_cycles / micros_cycles_per_us;
+  micros_cycle_remainder = total_cycles % micros_cycles_per_us;
+  return micros_accumulated;
 }
 
 static void micros_init(void) {
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CYCCNT = 0;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  micros_cycles_per_us = HAL_RCC_GetHCLKFreq() / 1000000UL;
+  if (micros_cycles_per_us == 0U) {
+    micros_cycles_per_us = 1U;
+  }
+  micros_last_cycles = DWT->CYCCNT;
+  micros_accumulated = 0U;
+  micros_cycle_remainder = 0U;
 }
 
 static uint32_t tim2_clock_hz(void) {
@@ -685,13 +729,21 @@ static void configure_stream(char *args) {
 static void configure_imu_stream(char *args) {
   char *rate_token = strtok(args, " ");
   char *enable_token = strtok(NULL, " ");
+  char *mask_token = strtok(NULL, " ");
+  if (mask_token != NULL) {
+    uint8_t requested_mask = (uint8_t)strtoul(mask_token, NULL, 0) & IMU_SELECT_ALL;
+    if (requested_mask != 0U) {
+      imu_sensor_mask = requested_mask;
+    }
+  }
   if (rate_token != NULL) {
     imu_stream_rate_hz = strtoul(rate_token, NULL, 10);
     if (imu_stream_rate_hz == 0UL) {
       imu_stream_rate_hz = DEFAULT_IMU_STREAM_RATE_HZ;
     }
-    if (imu_stream_rate_hz > 1000UL) {
-      imu_stream_rate_hz = 1000UL;
+    uint32_t maximum_rate_hz = max_imu_rate_for_mask(imu_sensor_mask);
+    if (imu_stream_rate_hz > maximum_rate_hz) {
+      imu_stream_rate_hz = maximum_rate_hz;
     }
     (void)Imu_SetAccelRate(imu_stream_rate_hz);
     imu_stream_interval_us = 1000000UL / imu_stream_rate_hz;
@@ -1236,7 +1288,7 @@ static void imu_stream_tick(void) {
   }
 
   ImuSample sample;
-  bool ok = Imu_Read(&sample);
+  bool ok = Imu_ReadSelected(&sample, imu_sensor_mask);
   append_imu_sample(&sample, ok, now);
 
   do {

@@ -163,6 +163,10 @@ bool Imu_SetAccelRate(uint32_t rate_hz) {
 }
 
 bool Imu_Read(ImuSample *sample) {
+  return Imu_ReadSelected(sample, IMU_SELECT_ALL);
+}
+
+bool Imu_ReadSelected(ImuSample *sample, uint8_t sensor_mask) {
   if (sample == NULL) {
     return false;
   }
@@ -171,7 +175,8 @@ bool Imu_Read(ImuSample *sample) {
   bool any_ok = false;
 
   uint8_t raw[8];
-  if (imu_status.accel_ok && i2c_read_reg(ADXL345_ADDR, ADXL345_REG_DATAX0, raw, 6U)) {
+  if ((sensor_mask & IMU_SELECT_ACCEL) != 0U &&
+      imu_status.accel_ok && i2c_read_reg(ADXL345_ADDR, ADXL345_REG_DATAX0, raw, 6U)) {
     sample->accel[0] = le_i16(raw[0], raw[1]);
     sample->accel[1] = le_i16(raw[2], raw[3]);
     sample->accel[2] = le_i16(raw[4], raw[5]);
@@ -180,7 +185,8 @@ bool Imu_Read(ImuSample *sample) {
     sample->status.accel_ok = false;
   }
 
-  if (imu_status.gyro_ok && i2c_read_reg(ITG3200_ADDR, ITG3200_REG_GYRO_XOUT, raw, 6U)) {
+  if ((sensor_mask & IMU_SELECT_GYRO) != 0U &&
+      imu_status.gyro_ok && i2c_read_reg(ITG3200_ADDR, ITG3200_REG_GYRO_XOUT, raw, 6U)) {
     sample->gyro[0] = be_i16(raw[0], raw[1]);
     sample->gyro[1] = be_i16(raw[2], raw[3]);
     sample->gyro[2] = be_i16(raw[4], raw[5]);
@@ -189,7 +195,8 @@ bool Imu_Read(ImuSample *sample) {
     sample->status.gyro_ok = false;
   }
 
-  if (imu_status.mag_ok && i2c_read_reg(QMC5883_ADDR, QMC5883_REG_DATA, raw, 6U)) {
+  if ((sensor_mask & IMU_SELECT_MAG) != 0U &&
+      imu_status.mag_ok && i2c_read_reg(QMC5883_ADDR, QMC5883_REG_DATA, raw, 6U)) {
     sample->mag[0] = le_i16(raw[0], raw[1]);
     sample->mag[1] = le_i16(raw[2], raw[3]);
     sample->mag[2] = le_i16(raw[4], raw[5]);
@@ -198,7 +205,8 @@ bool Imu_Read(ImuSample *sample) {
     sample->status.mag_ok = false;
   }
 
-  if (imu_status.bmp_ok && i2c_read_reg(imu_status.bmp_addr, BMP280_REG_PRESS_MSB, raw, 6U)) {
+  if ((sensor_mask & IMU_SELECT_BMP) != 0U &&
+      imu_status.bmp_ok && i2c_read_reg(imu_status.bmp_addr, BMP280_REG_PRESS_MSB, raw, 6U)) {
     sample->bmp_pressure_raw = ((int32_t)raw[0] << 12) | ((int32_t)raw[1] << 4) | ((int32_t)raw[2] >> 4);
     sample->bmp_temperature_raw = ((int32_t)raw[3] << 12) | ((int32_t)raw[4] << 4) | ((int32_t)raw[5] >> 4);
     any_ok = true;

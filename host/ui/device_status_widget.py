@@ -24,6 +24,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QCoreApplication, Qt, QThread, QTimer, pyqtSignal
 
 from hardware.haptic_device_interface import HapticDeviceInterface
+from hardware.imu_config import max_rate_for_fields
+from scripts.imu_flatline_sweep import format_result as format_imu_result
+from scripts.imu_flatline_sweep import run_rate as run_imu_rate
 from scripts.haptic_max_throughput import (
     requested_rates,
     run_duplex_trial,
@@ -335,6 +338,48 @@ class ThroughputWorker(QThread):
         )
 
 
+class ImuDiagnosticsWorker(QThread):
+    """Sweep selected IMU inputs and report delivery and flatline diagnostics."""
+
+    line = pyqtSignal(str)
+    finished = pyqtSignal()
+
+    def __init__(self, hardware_interface, rates, fields, duration):
+        super().__init__()
+        self.hardware_interface = hardware_interface
+        self.rates = rates
+        self.fields = fields
+        self.duration = duration
+
+    def run(self):
+        try:
+            self.line.emit(f"Inputs: {', '.join(self.fields)}")
+            self.line.emit(f"Rates: {self.rates}")
+            self.line.emit("Move the selected sensor throughout the sweep.")
+            for rate in self.rates:
+                if self.isInterruptionRequested():
+                    break
+                result = run_imu_rate(
+                    self.hardware_interface,
+                    rate,
+                    self.duration,
+                    0.5,
+                    0.8,
+                    self.fields,
+                )
+                self.line.emit(format_imu_result(result))
+                self.msleep(200)
+        except Exception as exc:
+            self.line.emit(f"ERROR: {exc}")
+        finally:
+            if hasattr(self.hardware_interface, "is_running") and self.hardware_interface.is_running():
+                try:
+                    self.hardware_interface.stop_acquisition()
+                except Exception:
+                    pass
+            self.finished.emit()
+
+
 class DeviceStatusWidget(QWidget):
     """Compact device connection, channel configuration, and status panel."""
 
@@ -344,6 +389,7 @@ class DeviceStatusWidget(QWidget):
         self.health_worker = None
         self.health_countdown_remaining = 0
         self.throughput_worker = None
+        self.imu_diagnostics_worker = None
         self._diagnostics_reconnect_port = None
         self._diagnostics_was_connected = False
         self.setup_ui()
@@ -463,7 +509,8 @@ class DeviceStatusWidget(QWidget):
         imu_button_layout.addWidget(self.imu_stream_check)
         imu_button_layout.addWidget(QLabel("Rate:"))
         self.imu_stream_rate_spinbox = QSpinBox()
-        self.imu_stream_rate_spinbox.setRange(1, 10000)
+        # This diagnostic displays every sensor, so it uses the four-chip limit.
+        self.imu_stream_rate_spinbox.setRange(1, 800)
         self.imu_stream_rate_spinbox.setSingleStep(1000)
         self.imu_stream_rate_spinbox.setValue(100)
         imu_button_layout.addWidget(self.imu_stream_rate_spinbox)
@@ -481,6 +528,36 @@ class DeviceStatusWidget(QWidget):
         imu_layout.addWidget(self.imu_text)
         imu_group.setLayout(imu_layout)
         detailed_layout.addWidget(imu_group)
+
+        imu_diagnostics_group = QGroupBox("IMU Stream Diagnostics")
+        imu_diagnostics_layout = QVBoxLayout()
+        imu_diagnostics_controls = QHBoxLayout()
+        imu_diagnostics_controls.addWidget(QLabel("Inputs:"))
+        self.imu_diag_inputs_combo = QComboBox()
+        self.imu_diag_inputs_combo.addItems(
+            ["Accelerometer", "Gyroscope", "Magnetometer", "Pressure / temperature", "All sensors"]
+        )
+        imu_diagnostics_controls.addWidget(self.imu_diag_inputs_combo)
+        imu_diagnostics_controls.addWidget(QLabel("Seconds per rate:"))
+        self.imu_diag_duration_spinbox = QDoubleSpinBox()
+        self.imu_diag_duration_spinbox.setRange(1.0, 30.0)
+        self.imu_diag_duration_spinbox.setValue(5.0)
+        imu_diagnostics_controls.addWidget(self.imu_diag_duration_spinbox)
+        self.run_imu_diag_button = QPushButton("Run IMU Sweep")
+        self.run_imu_diag_button.clicked.connect(self.run_imu_diagnostics)
+        imu_diagnostics_controls.addWidget(self.run_imu_diag_button)
+        self.stop_imu_diag_button = QPushButton("Stop")
+        self.stop_imu_diag_button.setEnabled(False)
+        self.stop_imu_diag_button.clicked.connect(self.stop_imu_diagnostics)
+        imu_diagnostics_controls.addWidget(self.stop_imu_diag_button)
+        imu_diagnostics_controls.addStretch()
+        imu_diagnostics_layout.addLayout(imu_diagnostics_controls)
+        self.imu_diagnostics_text = QPlainTextEdit()
+        self.imu_diagnostics_text.setReadOnly(True)
+        self.imu_diagnostics_text.setMinimumHeight(150)
+        imu_diagnostics_layout.addWidget(self.imu_diagnostics_text)
+        imu_diagnostics_group.setLayout(imu_diagnostics_layout)
+        detailed_layout.addWidget(imu_diagnostics_group)
 
         error_group = QGroupBox("Recent Protocol Errors")
         error_layout = QVBoxLayout()
@@ -783,6 +860,68 @@ class DeviceStatusWidget(QWidget):
         self.throughput_worker.finished.connect(self.on_throughput_finished)
         self.throughput_worker.start()
 
+    def _selected_imu_diagnostic_fields(self):
+        return {
+            "Accelerometer": ["accel_x", "accel_y", "accel_z"],
+            "Gyroscope": ["gyro_x", "gyro_y", "gyro_z"],
+            "Magnetometer": ["mag_x", "mag_y", "mag_z"],
+            "Pressure / temperature": ["pressure", "temperature"],
+            "All sensors": [
+                "accel_x", "accel_y", "accel_z",
+                "gyro_x", "gyro_y", "gyro_z",
+                "mag_x", "mag_y", "mag_z",
+                "pressure", "temperature",
+            ],
+        }[self.imu_diag_inputs_combo.currentText()]
+
+    def run_imu_diagnostics(self):
+        if not self._is_connected():
+            self.imu_diagnostics_text.setPlainText("Connect to the serial device first.")
+            return
+        if self.throughput_worker and self.throughput_worker.isRunning():
+            self.imu_diagnostics_text.setPlainText("Stop throughput diagnostics first.")
+            return
+
+        fields = self._selected_imu_diagnostic_fields()
+        maximum = max_rate_for_fields(fields)
+        rates = [
+            rate for rate in (25, 50, 100, 200, 400, 800, 1000, 1600, 3200)
+            if rate <= maximum
+        ]
+        self.imu_diagnostics_text.clear()
+        self.timer.stop()
+        self.run_imu_diag_button.setEnabled(False)
+        self.run_diag_button.setEnabled(False)
+        self.stop_imu_diag_button.setEnabled(True)
+        self.imu_diagnostics_worker = ImuDiagnosticsWorker(
+            self.hardware_interface,
+            rates,
+            fields,
+            self.imu_diag_duration_spinbox.value(),
+        )
+        self.imu_diagnostics_worker.line.connect(
+            self.imu_diagnostics_text.appendPlainText
+        )
+        self.imu_diagnostics_worker.finished.connect(
+            self.on_imu_diagnostics_finished
+        )
+        self.imu_diagnostics_worker.start()
+
+    def stop_imu_diagnostics(self):
+        if self.imu_diagnostics_worker and self.imu_diagnostics_worker.isRunning():
+            self.imu_diagnostics_worker.requestInterruption()
+            self.imu_diagnostics_text.appendPlainText(
+                "Stopping after the current rate..."
+            )
+
+    def on_imu_diagnostics_finished(self):
+        self.run_imu_diag_button.setEnabled(True)
+        self.run_diag_button.setEnabled(True)
+        self.stop_imu_diag_button.setEnabled(False)
+        self.imu_diagnostics_worker = None
+        self.timer.start(1000)
+        self.refresh_status()
+
     def stop_throughput_diagnostics(self):
         if self.throughput_worker and self.throughput_worker.isRunning():
             self.throughput_worker.requestInterruption()
@@ -856,7 +995,11 @@ class DeviceStatusWidget(QWidget):
         try:
             rate = self.imu_stream_rate_spinbox.value()
             enabled = self.imu_stream_check.isChecked()
-            reply = self.hardware_interface.configure_imu_stream(rate, enabled)
+            reply = self.hardware_interface.configure_imu_stream(
+                rate, enabled, [
+                    "accel_x", "gyro_x", "mag_x", "pressure", "temperature"
+                ]
+            )
             self.imu_text.setPlainText(f"{reply}\nIMU stream {'enabled' if enabled else 'disabled'} at {rate} Hz.")
             self.refresh_status()
         except Exception as exc:
@@ -878,7 +1021,11 @@ class DeviceStatusWidget(QWidget):
         rate = self.imu_stream_rate_spinbox.value()
         samples = []
         try:
-            self.hardware_interface.configure_imu_stream(rate, True)
+            self.hardware_interface.configure_imu_stream(
+                rate, True, [
+                    "accel_x", "gyro_x", "mag_x", "pressure", "temperature"
+                ]
+            )
             if hasattr(self.hardware_interface, "is_running") and not self.hardware_interface.is_running():
                 self.hardware_interface.start_acquisition()
                 started_acquisition = True

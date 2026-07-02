@@ -153,7 +153,9 @@ class MockDAQInterface(DAQInterface):
         """Accept channel configuration in mock mode."""
         return f"OK mock channel {pin} {role}"
 
-    def configure_imu_stream(self, sample_rate: int = 100, enabled: bool = True) -> str:
+    def configure_imu_stream(
+        self, sample_rate: int = 100, enabled: bool = True, imu_fields=None
+    ) -> str:
         """Configure mock IMU streaming."""
         self._imu_sample_rate = int(sample_rate)
         self._imu_stream_enabled = bool(enabled)

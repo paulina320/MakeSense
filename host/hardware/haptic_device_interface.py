@@ -18,6 +18,7 @@ from typing import Deque, Dict, List, Optional
 import numpy as np
 
 from .daq_interface import DAQInterface
+from .imu_config import IMU_ALL, sensor_mask_for_fields
 from .serial_protocol import (
     Frame,
     MAX_PAYLOAD_SIZE,
@@ -152,11 +153,16 @@ class HapticDeviceInterface(DAQInterface):
         if self.is_connected():
             self.send_command("CONFIG_STREAM", self._sample_rate, "")
 
-    def configure_imu_stream(self, sample_rate: int = 100, enabled: bool = True) -> str:
+    def configure_imu_stream(
+        self, sample_rate: int = 100, enabled: bool = True, imu_fields=None
+    ) -> str:
         sample_rate = int(sample_rate)
         enabled = bool(enabled)
+        sensor_mask = sensor_mask_for_fields(imu_fields) if imu_fields is not None else IMU_ALL
         if self.is_connected():
-            reply = self.send_command("CONFIG_IMU_STREAM", sample_rate, int(enabled))
+            reply = self.send_command(
+                "CONFIG_IMU_STREAM", sample_rate, int(enabled), sensor_mask
+            )
         else:
             reply = "OK offline"
         self._status.imu_rate = sample_rate
@@ -420,7 +426,7 @@ class HapticDeviceInterface(DAQInterface):
             self._channels = []
         self.configure_render_outputs(output_channels)
         if imu_fields:
-            self.configure_imu_stream(imu_sample_rate, True)
+            self.configure_imu_stream(imu_sample_rate, True, imu_fields)
         self.start_acquisition()
         self.start_rendering()
 

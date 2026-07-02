@@ -22,6 +22,7 @@ import numpy as np
 from processing.recording import Recording, RecordingMetadata
 from data import FileIO
 from ui.recording_display_widget import RecordingDisplayWidget
+from hardware.imu_config import max_rate_for_fields
 import time
 
 class RecordingWorker(QThread):
@@ -82,7 +83,9 @@ class RecordingWorker(QThread):
             if self.pixi_channels:
                 self.recording_interface.configure_channels(self.pixi_channels, self.sample_rate)
             if self.imu_fields and hasattr(self.recording_interface, "configure_imu_stream"):
-                self.recording_interface.configure_imu_stream(self.imu_sample_rate, True)
+                self.recording_interface.configure_imu_stream(
+                    self.imu_sample_rate, True, self.imu_fields
+                )
             self.recording_interface.start_acquisition()
             acquisition_start_time = time.monotonic()
             lead_time = acquisition_start_time - setup_start_time
@@ -374,7 +377,7 @@ class RecordingWidget(QWidget):
         imu_rate_layout = QHBoxLayout()
         imu_rate_layout.addWidget(QLabel("Rate (Hz):"))
         self.imu_rate_spinbox = QSpinBox()
-        self.imu_rate_spinbox.setRange(1, 10000)
+        self.imu_rate_spinbox.setRange(1, 3200)
         self.imu_rate_spinbox.setSingleStep(1000)
         self.imu_rate_spinbox.setValue(100)
         imu_rate_layout.addWidget(self.imu_rate_spinbox)
@@ -398,11 +401,13 @@ class RecordingWidget(QWidget):
         ]
         for index, (field, label) in enumerate(imu_fields):
             check = QCheckBox(label)
+            check.toggled.connect(self.update_imu_rate_limit)
             self.imu_field_checks[field] = check
             imu_grid.addWidget(check, index // 3, index % 3)
         imu_layout.addLayout(imu_grid)
         imu_group.setLayout(imu_layout)
         input_layout.addWidget(imu_group)
+        self.update_imu_rate_limit()
 
         params_layout.addLayout(input_layout)
         
@@ -643,6 +648,13 @@ class RecordingWidget(QWidget):
     def selected_imu_fields(self) -> list[str]:
         """Return selected IMU fields."""
         return [field for field, check in self.imu_field_checks.items() if check.isChecked()]
+
+    def update_imu_rate_limit(self) -> None:
+        maximum = max_rate_for_fields(self.selected_imu_fields())
+        self.imu_rate_spinbox.setMaximum(maximum)
+        self.imu_rate_spinbox.setToolTip(
+            f"Maximum {maximum} Hz for the currently selected IMU chips"
+        )
 
     def update_pixi_input_count(self):
         """Keep Pixi amount synchronized with checked pins."""

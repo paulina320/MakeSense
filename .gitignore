@@ -1,6 +1,7 @@
 # Codex/project-local metadata
 .agents/
 .git-empty-backup/
+.local_tests/
 .pytest_cache/
 
 # Only the active STM32 firmware belongs in the device tree
@@ -11,3 +12,4 @@ device/firmware/*
 !device/firmware/stm32_haptic_device/
 device/firmware/stm32_haptic_device/Debug/
 device/firmware/stm32_haptic_device/Release/
+device/firmware/stm32_haptic_device/.settings/com.st.stm32cube.ide.mcu.sfr.prefs

@@ -20,6 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread
 import pyqtgraph as pg
 import numpy as np
 from processing.characterization import Characterizer, ActuatorCharacterization
+from hardware.imu_config import max_rate_for_fields
 
 
 class CharacterizationWorker(QThread):
@@ -98,7 +99,7 @@ class CharacterizationWidget(QWidget):
         imu_rate_layout = QHBoxLayout()
         imu_rate_layout.addWidget(QLabel("Rate (Hz):"))
         self.imu_rate_spinbox = QSpinBox()
-        self.imu_rate_spinbox.setRange(1, 1000)
+        self.imu_rate_spinbox.setRange(1, 3200)
         self.imu_rate_spinbox.setValue(100)
         imu_rate_layout.addWidget(self.imu_rate_spinbox)
         imu_rate_layout.addStretch()
@@ -107,11 +108,13 @@ class CharacterizationWidget(QWidget):
         self.imu_field_checks = {}
         for index, (field, label) in enumerate(self._imu_field_labels()):
             check = QCheckBox(label)
+            check.toggled.connect(self.update_imu_rate_limit)
             self.imu_field_checks[field] = check
             imu_grid.addWidget(check, index // 3, index % 3)
         imu_layout.addLayout(imu_grid)
         imu_group.setLayout(imu_layout)
         input_layout.addWidget(imu_group)
+        self.update_imu_rate_limit()
         channel_layout.addLayout(input_layout)
 
         channel_group.setLayout(channel_layout)
@@ -315,6 +318,13 @@ class CharacterizationWidget(QWidget):
 
     def selected_imu_fields(self) -> list[str]:
         return [field for field, check in self.imu_field_checks.items() if check.isChecked()]
+
+    def update_imu_rate_limit(self) -> None:
+        maximum = max_rate_for_fields(self.selected_imu_fields())
+        self.imu_rate_spinbox.setMaximum(maximum)
+        self.imu_rate_spinbox.setToolTip(
+            f"Maximum {maximum} Hz for the currently selected IMU chips"
+        )
 
     @staticmethod
     def _imu_field_labels() -> list[tuple[str, str]]:
