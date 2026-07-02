@@ -7,6 +7,83 @@ import numpy as np
 from .compensation import Compensator
 
 
+WINDOW_TYPES = (
+    "off",
+    "full_hann_50",
+    "linear",
+    "half_hann",
+    "smoothstep",
+    "smootherstep",
+    "equal_power",
+)
+
+
+def boundary_crossfade_gains(sample_count: int, window_type: str) -> tuple[np.ndarray, np.ndarray]:
+    """Return fade-out and fade-in gains for a loop-boundary crossfade."""
+    sample_count = max(1, int(sample_count))
+    window_type = str(window_type).lower()
+    if window_type not in WINDOW_TYPES:
+        raise ValueError(f"Unknown boundary window: {window_type}")
+
+    x = np.arange(sample_count, dtype=np.float64) / sample_count
+    if window_type == "off":
+        fade_in = np.zeros(sample_count, dtype=np.float64)
+    elif window_type == "linear":
+        fade_in = x
+    elif window_type in ("half_hann", "full_hann_50"):
+        fade_in = 0.5 - 0.5 * np.cos(np.pi * x)
+    elif window_type == "smoothstep":
+        fade_in = 3.0 * x**2 - 2.0 * x**3
+    elif window_type == "smootherstep":
+        fade_in = 6.0 * x**5 - 15.0 * x**4 + 10.0 * x**3
+    else:
+        fade_in = np.sin(0.5 * np.pi * x)
+
+    fade_out = (
+        np.cos(0.5 * np.pi * x)
+        if window_type == "equal_power"
+        else 1.0 - fade_in
+    )
+    return fade_out.astype(np.float32), fade_in.astype(np.float32)
+
+
+def make_boundary_crossfade_loop(
+    signal_data: np.ndarray,
+    sample_rate: int,
+    duration_ms: float = 20.0,
+    window_type: str = "full_hann_50",
+) -> np.ndarray:
+    """Join a signal's tail and head with a short selectable crossfade.
+
+    Only the boundary is changed. The overlapping tail and head occupy one
+    shared region, so the resulting loop cycle is shorter by the crossfade
+    duration (20 ms turns a 400 ms source into a 380 ms cycle).
+    """
+    signal_data = np.asarray(signal_data, dtype=np.float32).reshape(-1)
+    sample_count = len(signal_data)
+    if sample_count < 2 or window_type == "off":
+        return signal_data.copy()
+
+    if window_type == "full_hann_50":
+        hop = max(1, sample_count // 2)
+        positions = np.arange(sample_count, dtype=np.float64)
+        window = 0.5 - 0.5 * np.cos(2.0 * np.pi * positions / sample_count)
+        output = np.zeros(hop, dtype=np.float64)
+        weight_sum = np.zeros(hop, dtype=np.float64)
+        phases = np.arange(sample_count) % hop
+        np.add.at(output, phases, signal_data * window)
+        np.add.at(weight_sum, phases, window)
+        np.divide(output, weight_sum, out=output, where=weight_sum > 0.0)
+        return output.astype(np.float32)
+
+    overlap = max(1, int(round(float(sample_rate) * float(duration_ms) / 1000.0)))
+    overlap = min(overlap, sample_count // 2)
+    fade_out, fade_in = boundary_crossfade_gains(overlap, window_type)
+    crossfade = signal_data[-overlap:] * fade_out + signal_data[:overlap] * fade_in
+    middle = signal_data[overlap:-overlap]
+    return np.concatenate((middle, crossfade)).astype(np.float32, copy=False)
+
+
 class Renderer:
     """Small owner for processing helpers used by the rendering UI."""
     
