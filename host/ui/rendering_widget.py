@@ -16,12 +16,17 @@ if str(project_root) not in sys.path:
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QSlider, QLabel,
-    QCheckBox, QPlainTextEdit, QProgressBar
+    QCheckBox, QComboBox, QSpinBox, QPlainTextEdit, QProgressBar
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 import numpy as np
 import pyqtgraph as pg
-from processing.rendering import Renderer, PlaybackController
+from processing.rendering import (
+    Renderer,
+    PlaybackController,
+    boundary_crossfade_gains,
+    make_boundary_crossfade_loop,
+)
 from processing.recording import Recording
 
 
@@ -85,6 +90,8 @@ class DevicePlaybackWorker(QThread):
         sample_rate: int,
         output_channels: list[int],
         loop: bool = False,
+        boundary_window: str = "full_hann_50",
+        crossfade_ms: float = 20.0,
     ):
         super().__init__()
         self.hardware_interface = hardware_interface
@@ -92,6 +99,13 @@ class DevicePlaybackWorker(QThread):
         self.sample_rate = int(sample_rate)
         self.output_channels = output_channels or [1]
         self.loop = bool(loop)
+        if self.loop:
+            self.signal_data = make_boundary_crossfade_loop(
+                self.signal_data,
+                self.sample_rate,
+                crossfade_ms,
+                boundary_window,
+            )
 
     def run(self):
         rendering_started = False
@@ -342,10 +356,75 @@ class RenderingWidget(QWidget):
             "QCheckBox::indicator { width: 24px; height: 24px; }"
             "QCheckBox:checked { background: #eaf7fd; border-color: #0aa9e8; }"
         )
+        self.loop_check.toggled.connect(self._update_loop_controls)
         button_layout.addWidget(self.loop_check)
         
         button_layout.addStretch()
         playback_layout.addLayout(button_layout)
+
+        self.windowing_group = QGroupBox("Loop windowing")
+        self.windowing_group.setStyleSheet(
+            "QGroupBox:disabled { color: #9aa3b2; border-color: #d9dee7; }"
+            "QLabel:disabled { color: #9aa3b2; }"
+            "QComboBox:disabled, QSpinBox:disabled {"
+            "  background-color: #e5e7eb;"
+            "  color: #9aa3b2;"
+            "  border: 1px solid #cbd1da;"
+            "}"
+            "QComboBox:disabled::drop-down, QSpinBox:disabled::up-button,"
+            "QSpinBox:disabled::down-button {"
+            "  background-color: #d9dee7;"
+            "  border-color: #cbd1da;"
+            "}"
+            "QComboBox:enabled, QSpinBox:enabled {"
+            "  background-color: #ffffff;"
+            "  color: #263246;"
+            "  border: 1px solid #aeb8c6;"
+            "}"
+            "QComboBox:enabled::drop-down, QSpinBox:enabled::up-button,"
+            "QSpinBox:enabled::down-button {"
+            "  background-color: #f4f7fa;"
+            "  border-color: #aeb8c6;"
+            "}"
+        )
+        windowing_layout = QVBoxLayout()
+        crossfade_layout = QHBoxLayout()
+        crossfade_layout.addWidget(QLabel("Loop boundary:"))
+        self.boundary_window_combo = QComboBox()
+        self.boundary_window_combo.addItem("Off (hard repeat)", "off")
+        self.boundary_window_combo.addItem("Full Hann · 50% overlap", "full_hann_50")
+        self.boundary_window_combo.addItem("Half-Hann / Tukey edge", "half_hann")
+        self.boundary_window_combo.addItem("Linear", "linear")
+        self.boundary_window_combo.addItem("Smoothstep", "smoothstep")
+        self.boundary_window_combo.addItem("Smootherstep", "smootherstep")
+        self.boundary_window_combo.addItem("Equal-power sine", "equal_power")
+        self.boundary_window_combo.setCurrentIndex(1)
+        self.boundary_window_combo.currentIndexChanged.connect(self._update_window_plot)
+        crossfade_layout.addWidget(self.boundary_window_combo)
+        crossfade_layout.addSpacing(18)
+        crossfade_layout.addWidget(QLabel("Crossfade:"))
+        self.crossfade_duration_spin = QSpinBox()
+        self.crossfade_duration_spin.setRange(1, 100)
+        self.crossfade_duration_spin.setValue(20)
+        self.crossfade_duration_spin.setSuffix(" ms")
+        self.crossfade_duration_spin.valueChanged.connect(self._update_window_plot)
+        crossfade_layout.addWidget(self.crossfade_duration_spin)
+        crossfade_layout.addStretch()
+        windowing_layout.addLayout(crossfade_layout)
+
+        self.window_plot = pg.PlotWidget()
+        self.window_plot.setBackground("#ffffff")
+        self.window_plot.setLabel("left", "Gain")
+        self.window_plot.setLabel("bottom", "Boundary time", units="ms")
+        self.window_plot.setTitle("Loop-boundary crossfade")
+        self.window_plot.setMinimumHeight(150)
+        self.window_plot.setMaximumHeight(190)
+        self.window_plot.showGrid(x=True, y=True, alpha=0.25)
+        self.window_plot.addLegend(offset=(10, 10))
+        windowing_layout.addWidget(self.window_plot)
+        self.windowing_group.setLayout(windowing_layout)
+        playback_layout.addWidget(self.windowing_group)
+        self._update_loop_controls(False)
         
         # Volume control
         volume_layout = QHBoxLayout()
@@ -479,6 +558,7 @@ class RenderingWidget(QWidget):
             # Load into playback
             self.playback_controller.load_texture(rendered)
             self._show_time_signal(rendered)
+            self._update_window_plot()
             
             # Update info
             info_text = f"Rendered: {len(rendered)} samples ({len(rendered)/self.sample_rate:.2f}s)\n"
@@ -617,6 +697,8 @@ class RenderingWidget(QWidget):
             self.sample_rate,
             self.selected_output_channels(),
             self.loop_check.isChecked(),
+            self.boundary_window_combo.currentData(),
+            self.crossfade_duration_spin.value(),
         )
         self.device_playback_worker.error.connect(self._on_device_playback_error)
         self.device_playback_worker.progress.connect(self.progress_bar.setValue)
@@ -657,3 +739,105 @@ class RenderingWidget(QWidget):
         elif hasattr(self.hardware_interface, "configure_channel"):
             for channel in channels:
                 self.hardware_interface.configure_channel(channel, role="output", stream_enabled=False)
+
+    def _update_loop_controls(self, enabled: bool):
+        """Enable boundary controls for looping and refresh their preview."""
+        self.windowing_group.setEnabled(enabled)
+        self.crossfade_duration_spin.setEnabled(
+            enabled
+            and self.boundary_window_combo.currentData() not in ("off", "full_hann_50")
+        )
+        self.window_plot.setBackground("#ffffff" if enabled else "#eef1f5")
+        self.window_plot.getPlotItem().setOpacity(1.0 if enabled else 0.35)
+        self._update_window_plot()
+
+    def _update_window_plot(self):
+        """Plot three complete signal windows and their collaborative gain."""
+        if not hasattr(self, "window_plot"):
+            return
+        self.window_plot.clear()
+        window_type = self.boundary_window_combo.currentData()
+        enabled = self.loop_check.isChecked()
+        self.crossfade_duration_spin.setEnabled(
+            enabled and window_type not in ("off", "full_hann_50")
+        )
+        data = self.playback_controller.playback_data
+        signal_duration = (
+            len(data) / max(1, self.sample_rate)
+            if data is not None and len(data) > 0
+            else 0.4
+        )
+        overlap = (
+            signal_duration / 2.0
+            if window_type == "full_hann_50"
+            else min(
+                self.crossfade_duration_spin.value() / 1000.0,
+                signal_duration / 2.0,
+            )
+        )
+        hop = signal_duration if window_type == "off" else signal_duration - overlap
+        starts = (-hop, 0.0, hop)
+        timeline = np.linspace(starts[0], starts[-1] + signal_duration, 1600)
+
+        def signal_envelope(start: float) -> np.ndarray:
+            local_time = timeline - start
+            inside = (local_time >= 0.0) & (local_time < signal_duration)
+            envelope = np.zeros_like(timeline)
+            if not np.any(inside):
+                return envelope
+            phase = local_time[inside] / signal_duration
+            if window_type == "off":
+                envelope[inside] = 1.0
+            elif window_type == "full_hann_50":
+                envelope[inside] = 0.5 - 0.5 * np.cos(2.0 * np.pi * phase)
+            else:
+                taper_points = 500
+                fade_out, fade_in = boundary_crossfade_gains(taper_points, window_type)
+                taper_phase = np.linspace(0.0, 1.0, taper_points, endpoint=False)
+                values = np.ones(np.count_nonzero(inside), dtype=np.float64)
+                local_inside = local_time[inside]
+                fade_in_region = local_inside < overlap
+                fade_out_region = local_inside >= signal_duration - overlap
+                values[fade_in_region] = np.interp(
+                    local_inside[fade_in_region] / overlap,
+                    taper_phase,
+                    fade_in,
+                )
+                values[fade_out_region] = np.interp(
+                    (local_inside[fade_out_region] - (signal_duration - overlap)) / overlap,
+                    taper_phase,
+                    fade_out,
+                )
+                envelope[inside] = values
+            return envelope
+
+        envelopes = [signal_envelope(start) for start in starts]
+        colors = ("#8fd3ee", "#0aa9e8", "#f28e2b")
+        names = ("Previous signal", "Current signal", "Next signal")
+        time_ms = timeline * 1000.0
+        for envelope, color, name in zip(envelopes, colors, names):
+            self.window_plot.plot(
+                time_ms,
+                envelope,
+                pen=pg.mkPen(color, width=2.1),
+                name=name,
+            )
+        self.window_plot.plot(
+            time_ms,
+            np.sum(envelopes, axis=0),
+            pen=pg.mkPen("#2f7d32", width=2.7, style=Qt.PenStyle.DashLine),
+            name="Collaborative gain",
+        )
+        self.window_plot.setLabel("bottom", "Signal timeline", units="ms")
+        label = self.boundary_window_combo.currentText()
+        detail = (
+            "50% overlap"
+            if window_type == "full_hann_50"
+            else "hard repeat"
+            if window_type == "off"
+            else f"{overlap * 1000.0:g} ms overlap"
+        )
+        self.window_plot.setTitle(
+            f"{label} · {signal_duration * 1000.0:g} ms signals · {detail}"
+        )
+        self.window_plot.setYRange(0.0, 1.5, padding=0.02)
